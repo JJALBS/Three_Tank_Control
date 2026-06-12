@@ -1,0 +1,14 @@
+controller_mode: "RL"
+controller_type: "DQN"
+
+UPPER_VALVE_PIN: 5
+LOWER_VALVE_PIN: 6
+PUMP_PIN: 4
+
+network_arg:
+  input_dim: 2
+  hidden_dim: 256
+  layer_num: 2
+  output_dim: 37
+lr: 0.00001
+replay_capa: 100000

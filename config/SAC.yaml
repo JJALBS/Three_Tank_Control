@@ -1,0 +1,27 @@
+controller_mode: "RL"
+controller_type: "SAC"
+
+UPPER_VALVE_PIN: 5
+LOWER_VALVE_PIN: 6
+PUMP_PIN: 4
+
+v_net_arg:
+  beta: 0.0003
+  input_dim: 2
+  hidden_dim: 128
+  layer_num: 2
+
+q_net_arg:
+  beta: 0.0003
+  input_dim: 3
+  hidden_dim: 128
+  layer_num: 2
+
+actor_net_arg:
+  alpha: 0.0003
+  input_dim: 2
+  hidden_dim: 128
+  layer_num: 2
+  max_action: 36.0
+
+replay_capa: 100000

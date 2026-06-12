@@ -1,0 +1,32 @@
+controller_mode: "RL"
+controller_type: "RecurrentPPO"
+
+UPPER_VALVE_PIN: 5
+LOWER_VALVE_PIN: 6
+PUMP_PIN: 4
+
+network_arg:
+  input_dim: 2
+  enc_hidden_dim: 128 # MLP encoder width  (was com_hidden_dim)
+  enc_layer_num: 2 # MLP encoder depth  (was com_layer_num)
+  lstm_hidden_dim: 128 # LSTM hidden size
+  lstm_num_layers: 1 # stacked LSTM layers (start with 1)
+  head_hidden_dim: 64
+  head_layer_num: 2
+  action_output_dim: 2 # α-raw, β-raw
+  value_output_dim: 1
+
+lr:
+  common: 0.0001 # applied to encoder + LSTM
+  critic: 0.0003
+  actor: 0.0001
+
+pum_max_speed: 36.0
+
+update_arg:
+  GAMMA: 0.99
+  LAMBDA: 0.95
+  epoches: 16
+  batch_size: 8 # number of EPISODES per mini-batch (not steps)
+  epsilon: 0.2
+  beta: 0.01 # lower entropy coef to avoid Beta collapsing
