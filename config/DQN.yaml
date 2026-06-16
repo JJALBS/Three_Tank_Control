@@ -12,3 +12,17 @@ network_arg:
   output_dim: 37
 lr: 0.00001
 replay_capa: 100000
+
+sensor:
+  cam_index: 1
+  conf: 0.25
+  inference_interval: 3
+  window_name: "Water Level"
+  A: 7.701273019117101
+  B: 0.7084194867553455
+  height_deci: 2
+  segmentation_view: True
+  recording: False
+  recording_name: "sensor_recording"
+  resolution_height: 480
+  resolution_width: 640

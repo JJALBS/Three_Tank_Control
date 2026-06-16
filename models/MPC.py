@@ -9,6 +9,9 @@ A = statespaceparam["A"]
 B = statespaceparam["B"]
 C = statespaceparam["C"]
 
+with open(r"..\parameters\steady_state_param.pickle", "rb") as f:
+    param = pickle.load(f)
+
 
 class environment:
     def __init__(self):
@@ -16,11 +19,14 @@ class environment:
         self.B = np.asarray(B, dtype=float)
         self.C = np.asarray(C, dtype=float)
 
-        self.nx = self.A.shape[0]
         if self.B.ndim == 1:
-            self.nu = 1
-        else:
-            self.nu = self.B.shape[1]
+            self.B = self.B.reshape(-1, 1)
+
+        if self.C.ndim == 1:
+            self.C = self.C.reshape(1, -1)
+
+        self.nx = self.A.shape[0]
+        self.nu = self.B.shape[1]
         self.ny = self.C.shape[0]
 
         self.I = np.eye(self.nx)
@@ -46,6 +52,9 @@ class environment:
             + (dt**5 / 120) * self.A4
         ) @ self.B
 
+        self.x_min = np.zeros((self.nx, 1))
+        self.x_max = 8.5 * np.ones((self.nx, 1))
+
     def step(self, x_t, u_t, dt=3):
         """
         NumPy-based simulation step.
@@ -55,15 +64,22 @@ class environment:
         x_t = np.asarray(x_t, dtype=float).reshape(self.nx, 1)
         u_t = np.asarray(u_t, dtype=float).reshape(self.nu, 1)
 
+        x_t = np.clip(x_t, self.x_min, self.x_max)
         x_t1 = self.Ad @ x_t + self.Bd @ u_t
-        y_t = self.C @ x_t
+        x_t1 = np.clip(x_t1, self.x_min, self.x_max)
 
-        return x_t1, y_t
+        y_t1 = self.C @ x_t1
+
+        return x_t1, y_t1
 
     def step_casadi(self, x_t, u_t, dt=3):
         """
         CasADi-compatible prediction step.
         Use this inside MPC optimization.
+
+        Important:
+        Do not clip states here.
+        State bounds should be imposed as optimization constraints.
         """
         Ad = ca.DM(self.Ad)
         Bd = ca.DM(self.Bd)
@@ -107,7 +123,6 @@ class KalmanFilter:
         A,
         B,
         C,
-        init_u,
         state_noise_covar=None,
         estim_err_covar=None,
     ):
@@ -116,6 +131,10 @@ class KalmanFilter:
         self.A = np.asarray(A, dtype=float)
         self.B = np.asarray(B, dtype=float)
         self.C = np.asarray(C, dtype=float)
+        if self.B.ndim == 1:
+            self.B = self.B.reshape(-1, 1)
+        if self.C.ndim == 1:
+            self.C = self.C.reshape(1, -1)
 
         n = self.A.shape[0]
         m = self.C.shape[0]
@@ -140,7 +159,7 @@ class KalmanFilter:
             ).reshape(n, n)
 
         self.u_storage = deque(
-            [np.asarray(init_u, dtype=float).reshape(-1, 1)],
+            [np.asarray([], dtype=float).reshape(-1, 1)],
             maxlen=2,
         )
 
@@ -173,12 +192,8 @@ class KalmanFilter:
         y = np.asarray(new_measurement, dtype=float).reshape(self.C.shape[0], 1)
         u = np.asarray(u, dtype=float).reshape(self.B.shape[1], 1)
 
-        # Store current input.
-        self.u_storage.append(u)
-        u_prev = self.u_storage[0]
-
         # 1. A priori prediction
-        self.priori_state_estim = self.A @ self.posteriori_state_estim + self.B @ u_prev
+        self.priori_state_estim = self.A @ self.posteriori_state_estim + self.B @ u
         self.priori_estim_err_covar = (
             self.A @ self.posteriori_estim_err_covar @ self.A.T + self.state_noise_covar
         )
@@ -213,10 +228,8 @@ class KalmanFilter:
                 I_KC @ self.priori_estim_err_covar @ I_KC.T
                 + self.gain @ self.measurement_covar @ self.gain.T
             )
-        if not self.is_symmetric_positive_definite(self.posteriori_estim_err_covar):
-            print(
-                "Warning: posterior covariance P is not semmetric positive-definite even after Joseph update."
-            )
+        # if not self.is_symmetric_positive_definite(self.posteriori_estim_err_covar):
+        # print("Warning: posterior covariance P is not semmetric positive-definite even after Joseph update.")
         self.posteriori_estim_err_covar = 0.5 * (
             self.posteriori_estim_err_covar + self.posteriori_estim_err_covar.T
         )
@@ -244,7 +257,6 @@ class ModelPredictiveControl:
         A,
         B,
         C,
-        init_u,
         Q,
         R,
         N,
@@ -258,7 +270,6 @@ class ModelPredictiveControl:
             A,
             B,
             C,
-            init_u,
             state_noise_covar,
             estim_err_covar,
         )
@@ -268,9 +279,17 @@ class ModelPredictiveControl:
         self.N = N
         self.set_point = set_point
         self.sys = environment()
+        self.steady_state_pump_speed = np.sqrt((set_point - param["B"]) / param["A"])
 
     def update_state(self, observation, input):
         self.state = self.kf.state_estimation(observation, input)
+
+        # Keep estimated state physically feasible
+        self.state = np.clip(
+            np.asarray(self.state, dtype=float).reshape(self.sys.nx, 1),
+            self.sys.x_min,
+            self.sys.x_max,
+        )
 
     def control(
         self,
@@ -317,6 +336,7 @@ class ModelPredictiveControl:
         # -----------------------------
         X = opti.variable(nx, N + 1)
         U = opti.variable(nu, N)
+        U_actual = U + self.steady_state_pump_speed
 
         # -----------------------------
         # Initial condition constraint
@@ -330,7 +350,8 @@ class ModelPredictiveControl:
 
         for k in range(N):
             x_k = X[:, k]
-            u_k = U[:, k]
+            delta_u_k = U[:, k]
+            u_k = U_actual[:, k]
 
             # Predict one step using the CasADi-compatible environment model
             x_next_pred, y_k = self.sys.step_casadi(x_k, u_k, dt=dt)
@@ -342,7 +363,7 @@ class ModelPredictiveControl:
             e_y = y_k - r
 
             # Stage cost
-            J += ca.mtimes([e_y.T, Q, e_y]) + ca.mtimes([u_k.T, R, u_k])
+            J += ca.mtimes([e_y.T, Q, e_y]) + ca.mtimes([delta_u_k.T, R, delta_u_k])
 
             # Optional state constraints
             if x_min is not None:
@@ -373,10 +394,10 @@ class ModelPredictiveControl:
         # Input constraints
         # -----------------------------
         if u_min is not None:
-            opti.subject_to(U >= u_min)
+            opti.subject_to(U_actual >= u_min)
 
         if u_max is not None:
-            opti.subject_to(U <= u_max)
+            opti.subject_to(U_actual <= u_max)
 
         # -----------------------------
         # Initial guesses
@@ -385,9 +406,9 @@ class ModelPredictiveControl:
 
         try:
             last_u = np.asarray(self.kf.u_storage[-1], dtype=float).reshape(nu, 1)
-            opti.set_initial(U, np.tile(last_u, (1, N)))
+            opti.set_initial(U_actual, np.tile(last_u, (1, N)))
         except Exception:
-            opti.set_initial(U, np.zeros((nu, N)))
+            opti.set_initial(U_actual, np.zeros((nu, N)))
 
         # -----------------------------
         # Solver settings
@@ -405,15 +426,15 @@ class ModelPredictiveControl:
         # -----------------------------
         sol = opti.solve()
 
-        U_opt = sol.value(U)
-        X_opt = sol.value(X)
+        U_opt = np.asarray(sol.value(U), dtype=float).reshape(nu, N)
+        X_opt = np.asarray(sol.value(X), dtype=float).reshape(nx, N + 1)
 
-        u0 = U_opt[:, 0].reshape(nu, 1)
+        u0 = U_opt[:, [0]]
 
         # For SISO system, return scalar control if desired
         if nu == 1:
-            u0_to_apply = float(u0.item())
+            u0_to_apply = float(u0.item()) + self.steady_state_pump_speed
         else:
-            u0_to_apply = u0
+            u0_to_apply = u0 + self.steady_state_pump_speed
 
         return u0_to_apply, U_opt, X_opt

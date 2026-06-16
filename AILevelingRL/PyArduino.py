@@ -6,8 +6,9 @@ from .telemetrix_uno_r4.minima.telemetrix_uno_r4_minima import telemetrix_uno_r4
 
 import logging
 
-class PyArduino():
-    def __init__(self, board_type : str):
+
+class PyArduino:
+    def __init__(self, board_type: str):
         """
         This function initialize board as board_type. User must input wifi, minima
 
@@ -20,12 +21,12 @@ class PyArduino():
 
         elif board_type == "minima":
             self.board = telemetrix_uno_r4_minima.TelemetrixUnoR4Minima()
-            print("selected_minima")   
+            print("selected_minima")
 
         else:
             print("error")
 
-    def run_digital_write(self, pin_number : int, pin_state : bool):
+    def run_digital_write(self, pin_number: int, pin_state: bool):
         """
         This function write arduino digital pins. Double checking with 13 led is recommended.
 
@@ -36,17 +37,17 @@ class PyArduino():
 
         if pin_state is True:
             self.board.digital_write(pin_number, 1)
-            logging.info(f'{pin_number} is {pin_state}')
+            logging.info(f"{pin_number} is {pin_state}")
 
         elif pin_state is False:
             self.board.digital_write(pin_number, 0)
-            logging.info(f'{pin_number} is {pin_state}')
-            
+            logging.info(f"{pin_number} is {pin_state}")
+
         time.sleep(0.001)
 
         # self.board.shutdown()
-    
-    def get_digital_state(self, pin_number : int):
+
+    def get_digital_state(self, pin_number: int):
         """
         This function read arduino digital pins. Double checking with any pin is recommended.
 
@@ -55,8 +56,10 @@ class PyArduino():
         """
         global digital_value
         digital_value = None
-        self.board.set_pin_mode_digital_input_pullup(pin_number, callback = self._get_digital_state_slicer)
-        
+        self.board.set_pin_mode_digital_input_pullup(
+            pin_number, callback=self._get_digital_state_slicer
+        )
+
         while digital_value is None:
             time.sleep(0.01)
 
@@ -64,14 +67,16 @@ class PyArduino():
 
         return digital_value
 
-    def run_digital_pwm_write(self, pin_number : int, pwm_intensity_percentage : int):
+    def run_digital_pwm_write(self, pin_number: int, pwm_intensity_percentage: int):
         max_value = 256
         self.board.set_pin_mode_analog_output(pin_number)
-        self.board.analog_write(pin_number, round(pwm_intensity_percentage / 100 * max_value))
-        time.sleep(.005)
+        self.board.analog_write(
+            pin_number, round(pwm_intensity_percentage / 100 * max_value)
+        )
+        time.sleep(0.005)
         # self.board.set_pin_mode_digital_output(pin_number)
 
-    def get_analog_state(self, pin_number : int):
+    def get_analog_state(self, pin_number: int):
         """
         This function read arduino analog pins. Double checking with any pin is recommended.
 
@@ -81,22 +86,24 @@ class PyArduino():
         global analog_value
 
         analog_value = None
-        self.board.set_pin_mode_analog_input(pin_number, differential = 0, callback = self._get_analog_state_slicer)
+        self.board.set_pin_mode_analog_input(
+            pin_number, differential=0, callback=self._get_analog_state_slicer
+        )
         while analog_value is None:
             time.sleep(0.01)
 
         return analog_value
-    
-    def run_pump_speed(self, target_speed: int):
+
+    def run_pump_speed(self, target_speed: float):
         """
         This function simplify usaage of MCP4728 controller. Max speed is limited to 20.
 
         Input : int
         """
-        #speed = np.clip(target_speed, 0, 20)
+        # speed = np.clip(target_speed, 0, 20)
         speed = target_speed
         self._run_MCP4728_control(1, speed)
-        
+
     def _get_digital_state_slicer(self, data):
         """
         This internal function slicing arduino's output datastream.
@@ -127,17 +134,26 @@ class PyArduino():
 
         analog_value = data[pin_state_index]
 
-    def _run_MCP4728_control(self, pin_number : int, voltage_percentage : int):
-        '''
+    def _run_MCP4728_control(self, pin_number: int, voltage_percentage: float):
+        """
         This function communicate MCP4728 with IIC communication. you may need to update your repo to newest version.
 
         Input : int, int
-        '''
+        """
         max_value = 255
         voltage_factor = 5 / 3.3
         error_compensate_percentage = voltage_percentage / 50
-        self.board.MCP4728_control(pin_number, round((voltage_percentage + error_compensate_percentage) / 100 * max_value * voltage_factor))
-        time.sleep(.005)
+        self.board.MCP4728_control(
+            pin_number,
+            round(
+                (voltage_percentage + error_compensate_percentage)
+                / 100
+                * max_value
+                * voltage_factor
+            ),
+        )
+        time.sleep(0.005)
+
 
 def main():
     """
@@ -183,10 +199,10 @@ def main():
     # 밸브, 외란 펌프 예제
     # pa.run_digital_write(4, True)
     # pa.run_digital_write(5, True)
-    
+
     # pa.run_digital_write(6, True)
     # pa.run_digital_write(7, True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
