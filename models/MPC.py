@@ -2,14 +2,19 @@ import casadi as ca
 import numpy as np
 from collections import deque
 import pickle
+from pathlib import Path
 
-with open(r"..\parameters\state_space_param.pickle", "rb") as f:
+BASE_DIR = Path(__file__).resolve().parent.parent
+PARAM_DIR = BASE_DIR / "parameters"
+
+with open(PARAM_DIR / "state_space_param.pickle", "rb") as f:
     statespaceparam = pickle.load(f)
+
 A = statespaceparam["A"]
 B = statespaceparam["B"]
 C = statespaceparam["C"]
 
-with open(r"..\parameters\steady_state_param.pickle", "rb") as f:
+with open(PARAM_DIR / "steady_state_param.pickle", "rb") as f:
     param = pickle.load(f)
 
 
