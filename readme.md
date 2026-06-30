@@ -1,5 +1,9 @@
 # Three-Tank Liquid-Level Control
 
+> Comparative evaluation of classical, model-based, and reinforcement-learning controllers on a three-tank liquid-level control system.
+
+![Three-tank experimental rig](data/setup_image/diagonal_view.jpg)
+
 ## Overview
 
 This repository documents a research-practice project on liquid-level regulation using a three-tank experimental rig. It compares conventional feedback controllers, model predictive control (MPC), and reinforcement-learning (RL) controllers under nominal and non-nominal operating conditions.
