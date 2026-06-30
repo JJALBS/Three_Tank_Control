@@ -2,7 +2,7 @@
 
 > Comparative evaluation of classical, model-based, and reinforcement-learning controllers on a three-tank liquid-level control system.
 
-![Three-tank experimental rig](data/setup_image/diagonal_view.jpg)
+![Three-tank experimental rig](data/setup_image/diagonal_view.jpg width="460")
 
 ## Overview
 
